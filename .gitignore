@@ -7,3 +7,4 @@ build/
 /.deploy.env
 /scripts/
 /tests/
+/CLAUDE.local.md
