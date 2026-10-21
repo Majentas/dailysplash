@@ -5,107 +5,128 @@ declare(strict_types=1);
 /**
  * This file is part of the Unpslash App
  * and licensed under the AGPL.
+ *
+ * Modified for DailySplash (see NOTICE).
  */
 
-namespace OCA\Unsplash\EventListener;
+namespace OCA\DailySplash\EventListener;
 
-use OCA\Unsplash\Services\SettingsService;
+use OCA\DailySplash\AppInfo\Application;
+use OCA\DailySplash\Services\ImageCacheService;
+use OCA\DailySplash\Services\SettingsService;
 use OCP\AppFramework\Http\Events\BeforeLoginTemplateRenderedEvent;
 use OCP\AppFramework\Http\Events\BeforeTemplateRenderedEvent;
+use OCP\Config\IUserConfig;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
-use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IURLGenerator;
+use OCP\IUserSession;
 use OCP\Util;
 
+/**
+ * @template-implements IEventListener<BeforeTemplateRenderedEvent|BeforeLoginTemplateRenderedEvent>
+ */
 class BeforeTemplateRenderedEventListener implements IEventListener
 {
-    /**
-     * BeforeTemplateRenderedEventListener constructor.
-     *
-     * @param SettingsService $settingsService
-     * @param IRequest $request
-     * @param IURLGenerator $urlGenerator
-     * @param LoggerInterface $logger
-     */
+    // compared lowercase: the login route is "core.login.showLoginForm"
+    private const LOGIN_ROUTES = [
+        'core.login.showloginform',
+        'core.twofactorchallenge.showchallenge',
+        'core.twofactorchallenge.selectchallenge',
+        'files_sharing.share.authenticate',
+        'files_sharing.share.showauthenticate',
+    ];
+
+    /** both events can fire for the same page */
+    private bool $added = false;
+
     public function __construct(
         private SettingsService $settingsService,
+        private ImageCacheService $imageCache,
         private IRequest $request,
         private IURLGenerator $urlGenerator,
+        private IUserSession $userSession,
+        private IUserConfig $userConfig,
     )
     {
     }
 
-    /**
-     * @param Event $event
-     */
     public function handle(Event $event): void
     {
-        if (!$event instanceof BeforeTemplateRenderedEvent && !$event instanceof BeforeLoginTemplateRenderedEvent) {
+        if ($this->added || (!$event instanceof BeforeTemplateRenderedEvent && !$event instanceof BeforeLoginTemplateRenderedEvent)) {
             return;
         }
 
-        $route = $this->request->getParam('_route');
-        $serverstyleDash = $this->settingsService->getUserStyleDashboardEnabled();
-        $serverstyleLogin = $this->settingsService->getServerStyleLoginEnabled();
+        $version = $this->imageCache->getCurrentVersion();
+        if ($version === '') {
+            // nothing cached (or "Nextcloud default" selected): keep the normal background
+            return;
+        }
 
-        switch ($route) {
-            case 'core.TwoFactorChallenge.showChallenge':
-            case 'files_sharing.Share.authenticate':
-            case 'core.login.showloginform':
-            case 'files_sharing.Share.showAuthenticate':
-                if ($serverstyleLogin) {
-                    $this->addHeaderFor('login');
-                    $this->addMetadata();
-                }
-                break;
-            case 'files_sharing.Share.showShare':
-                if ($serverstyleDash) {
-                    $this->addHeaderFor('dashboard');
-                }
-                break;
-            case 'dashboard.dashboard.index':
-                if ($event->isLoggedIn() && $serverstyleDash) {
-                    $this->addHeaderFor('dashboard');
-                    $this->addMetadata();
-                }
-                break;
-            default:
-                if ($event->isLoggedIn()) {
-                    if ($serverstyleDash) {
-                        $this->addHeaderFor('dashboard');
-                    }
-                }
-                break;
+        $route = strtolower((string)$this->request->getParam('_route', ''));
+        $isLogin = $event instanceof BeforeLoginTemplateRenderedEvent || in_array($route, self::LOGIN_ROUTES, true);
+
+        if ($isLogin) {
+            if ($this->settingsService->getServerStyleLoginEnabled()) {
+                $this->addHeaderFor('login', $version);
+                $this->addMetadata();
+            }
+            return;
+        }
+
+        if ($event instanceof BeforeTemplateRenderedEvent && $event->isLoggedIn() && $this->isDashboardStyledForUser()) {
+            $this->addHeaderFor('dashboard', $version);
+            if ($route === 'dashboard.dashboard.index') {
+                $this->addMetadata();
+            }
         }
     }
 
     /**
-     * Create both links, for static and dynamic css.
-     * @param String $target
-     * @return void
+     * Only when enabled by the admin, and only for users who kept the default theming background.
      */
-    private function addHeaderFor(string $target): void
+    private function isDashboardStyledForUser(): bool
     {
-        $linkToCSS = $this->urlGenerator->linkToRouteAbsolute('unsplash.css.' . $target);
+        if (!$this->settingsService->getServerStyleDashboardEnabled()) {
+            return false;
+        }
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return false;
+        }
+        try {
+            $background = $this->userConfig->getValueString($user->getUID(), 'theming', 'background_image', 'default');
+        } catch (\Exception) {
+            return false;
+        }
+        return $background === 'default';
+    }
+
+    /**
+     * Link the dynamic (versioned) and the static css.
+     */
+    private function addHeaderFor(string $target, string $imageVersion): void
+    {
+        $this->added = true;
+        $linkToCSS = $this->urlGenerator->linkToRoute(Application::APP_ID . '.css.' . $target, [
+            'v' => $this->settingsService->getStyleVersion($imageVersion),
+        ]);
 
         Util::addHeader('link', [
             'rel' => 'stylesheet',
             'href' => $linkToCSS,
         ]);
 
-        Util::addStyle('unsplash', $target . '_static');
+        Util::addStyle(Application::APP_ID, $target . '_static');
     }
 
     /**
      * Insert links to metadata scripts and styles
-     * @return void
      */
     private function addMetadata(): void
     {
-        Util::addScript('unsplash', "metadata");
-        Util::addStyle('unsplash', "metadata");
+        Util::addScript(Application::APP_ID, 'metadata');
+        Util::addStyle(Application::APP_ID, 'metadata');
     }
-
 }

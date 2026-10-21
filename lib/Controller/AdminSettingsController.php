@@ -5,132 +5,100 @@ declare(strict_types=1);
 /**
  * This file is part of the Unsplash App
  * and licensed under the AGPL.
+ *
+ * Modified for DailySplash (see NOTICE).
  */
 
-namespace OCA\Unsplash\Controller;
+namespace OCA\DailySplash\Controller;
 
-use OCA\Unsplash\Services\SettingsService;
+use OCA\DailySplash\Services\ImageCacheService;
+use OCA\DailySplash\Services\SettingsService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
+use OCP\IURLGenerator;
 
 /**
- * Class AdminSettingsController
+ * Admin only (no NoAdminRequired attribute), CSRF protected.
  *
- * @package OCA\Unsplash\Controller
+ * @package OCA\DailySplash\Controller
  */
 class AdminSettingsController extends Controller
 {
-
-    /**
-     * AdminSettingsController constructor.
-     *
-     * @param    $appName
-     * @param    IRequest $request
-     * @param    SettingsService $settings
-     */
     public function __construct(
-        $appName,
+        string $appName,
         IRequest $request,
         private SettingsService $settings,
+        private ImageCacheService $imageCache,
+        private IURLGenerator $urlGenerator,
     )
     {
         parent::__construct($appName, $request);
     }
 
     /**
-     * Update the app default settings
+     * Update one setting
      *
      * @param string $key
-     * @param        $value
-     *
-     * @return JSONResponse
+     * @param mixed $value
      */
-    public function set(string $key, bool|string|int|array|null $value): JSONResponse
+    public function set(string $key, mixed $value = null): JSONResponse
     {
-        // TODO: Refactor all the boolean handling (will need to be fixed in SettingsService at same time) and streamline all the code below
-        if (isset($value) && is_string($value) && strtolower($value) === 'true') {
-            $value = true;
-        }
-        if (isset($value) && is_string($value) && strtolower($value) === 'false') {
-            $value = false;
+        $bool = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        $int = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['default' => 0]]);
+
+        switch ($key) {
+            case 'style/login':
+                $this->settings->setServerStyleLoginEnabled($bool);
+                break;
+            case 'style/dashboard':
+                $this->settings->setServerStyleDashboardEnabled($bool);
+                break;
+            case 'style/tint':
+                $this->settings->setTint($bool);
+                break;
+            case 'style/strength/color':
+                $this->settings->setColorStrength($int);
+                break;
+            case 'style/strength/blur':
+                $this->settings->setBlurStrength($int);
+                break;
+            case 'style/login/highvisibility':
+                $this->settings->setHighVisibilityLogin($bool);
+                break;
+            case 'provider/provider':
+                if (!is_string($value) || !$this->settings->setImageProvider($value)) {
+                    return new JSONResponse(['status' => 'error', 'message' => 'Unknown provider'], Http::STATUS_BAD_REQUEST);
+                }
+                // admin-triggered: fetch now if this provider has no image yet
+                if ($this->imageCache->getCurrentVersion() === '') {
+                    $this->imageCache->refresh();
+                }
+                break;
+            case 'refresh':
+                $this->imageCache->refresh(true);
+                break;
+            default:
+                return new JSONResponse(['status' => 'error', 'message' => 'Unknown setting'], Http::STATUS_BAD_REQUEST);
         }
 
-        if ($key === 'style/login') { // TODO: $value should be sanity checked too
-            if ($value) {
-                $this->settings->setServerStyleLoginEnabled(1);
-            } else {
-                $this->settings->setServerStyleLoginEnabled(0);
-            }
-        } else if ($key === 'style/dashboard') { // TODO: $value should be sanity checked too
-            if ($value) {
-                $this->settings->setServerStyleDashboardEnabled(1);
-            } else {
-                $this->settings->setServerStyleDashboardEnabled(0);
-            }
-        } else if ($key === 'provider/provider') {
-            $this->settings->setImageProviderSanitized((string)$value);
-            return $this->generateProviderResponse($value);
-        } else if ($key === 'provider/customization') {
-            $this->settings->setImageProviderCustomization((string)$value);
-        } else if ($key === 'style/tint') {
-            if ($value) {
-                $this->settings->setTint(1);
-            } else {
-                $this->settings->setTint(0);
-            }
-        } else if ($key === 'style/strength/color') {
-            $this->settings->setColorStrength(filter_var($value, FILTER_SANITIZE_NUMBER_INT));
-        } else if ($key === 'style/strength/blur') {
-            $this->settings->setBlurStrength(filter_var($value, FILTER_SANITIZE_NUMBER_INT));
-        } else if ($key === 'style/login/highvisibility') {
-            if ($value) {
-                $this->settings->setHighVisibilityLogin(1);
-            } else {
-                $this->settings->setHighVisibilityLogin(0);
-            }
-        } else if ($key === 'provider/token') {
-            $this->settings->setCurrentProviderToken($value);
-        } else if ($key === 'delete/cache') {
-            $this->settings->updateCachedBackground();
-            return $this->generateProviderResponse("success");
-        } else {
-            return new JSONResponse(['status' => 'error'], Http::STATUS_BAD_REQUEST);
-        }
-
-        return new JSONResponse(['status' => $value]);
+        return new JSONResponse(['status' => 'ok'] + $this->getState());
     }
 
     /**
-     * Get the customizationstring for the requested providername
-     *
-     * @param string $providername
-     *
-     * @return JSONResponse
+     * What the settings page shows about the cached image.
      */
-    public function getCustomization(string $providername): JSONResponse
+    private function getState(): array
     {
-        $validProviders = $this->settings->getAllImageProvider();
-        if (!in_array($providername, $validProviders, true)) {
-            return new JSONResponse(['status' => 'error', 'message' => 'Unknown provider'], Http::STATUS_BAD_REQUEST);
-        }
-        $provider = $this->settings->getImageProvider($providername);
-        return new JSONResponse(['status' => 'ok', 'customization' => $provider->getCustomSearchterms()]);
-    }
-
-    private function generateProviderResponse(string $value): JSONResponse
-    {
-
-        $cached = $this->settings->isCached();
         $provider = $this->settings->getSelectedImageProvider();
-        $name = $provider->getName();
-        $url = $provider->getCachedImageURL();
-        return new JSONResponse([
-            'status' => $value,
-            'isCached' => $cached,
-            'provider' => $name,
-            'imageURL' => $url
-        ]);
+        $current = $this->imageCache->getCurrent();
+        return [
+            'provider' => $provider->getId(),
+            'isCached' => $provider->isCached(),
+            'imageURL' => $current === null ? '' : $this->urlGenerator->linkToRoute('dailysplash.image.get', ['v' => $current['version']]),
+            'imageDate' => $current === null ? '' : $current['metadata']->getImageDate(),
+            'lastError' => $this->settings->getLastFetchError(),
+        ];
     }
 }

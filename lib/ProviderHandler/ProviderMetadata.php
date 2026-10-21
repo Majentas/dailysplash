@@ -1,100 +1,117 @@
 <?php
 
-namespace OCA\Unsplash\ProviderHandler;
-
-use IRequest;
-use SettingsService;
+declare(strict_types=1);
 
 /**
  * @copyright Copyright (c) 2018, Felix Nüsse
+ * Modified for DailySplash in 2026 (see NOTICE).
  *
  * @author Felix Nüsse <felix.nuesse@t-online.de>
  *
- * @license GPL-v3.0
+ * @license GNU AGPL version 3 or any later version
  *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ */
+
+namespace OCA\DailySplash\ProviderHandler;
+
+/**
+ * Description of one daily image, as reported by a provider.
  */
 class ProviderMetadata
 {
-
-    protected $url;
-    protected $attributionUrl;
-    protected $description;
-    protected $author;
-    protected $source;
-
     /**
-     * PersonalSettingsController constructor.
-     *
-     * @param                 $url
-     * @param IRequest $description
-     * @param SettingsService $author
+     * @param string $imageUrl remote URL the image is downloaded from (server side only)
+     * @param string $attributionUrl page describing the image and its licence
+     * @param string $imageDescription
+     * @param string $imageAuthor
+     * @param string $source provider name
+     * @param string $imageDate date the provider published the image for (Y-m-d)
+     * @param string $license short licence name, if known
      */
-    public function __construct($imageUrl, $attributionUrl, $imageDescription, $imageAuthor, $imageSource)
+    public function __construct(
+        private string $imageUrl,
+        private string $attributionUrl,
+        private string $imageDescription,
+        private string $imageAuthor,
+        private string $source,
+        private string $imageDate,
+        private string $license = '',
+    )
     {
-        $this->url = $imageUrl;
-        $this->attributionUrl = $attributionUrl;
-        $this->description = $imageDescription;
-        $this->author = $imageAuthor;
-        $this->source = $imageSource;
     }
 
-
-    /**
-     * Get the url of this image
-     * @return String url
-     */
-    public function getImageUrl()
+    public function getImageUrl(): string
     {
-        return $this->url;
+        return $this->imageUrl;
     }
 
-    /**
-     * Get the description of this image
-     * @return String url
-     */
-    public function getImageDescription()
-    {
-        return $this->description;
-    }
-
-    /**
-     * Get the author of this image
-     * @return String url
-     */
-    public function getImageAuthor()
-    {
-        return $this->author;
-    }
-
-    /**
-     * Get the url to the profile of this image
-     * @return String url
-     */
-    public function getAttributionUrl()
+    public function getAttributionUrl(): string
     {
         return $this->attributionUrl;
     }
 
-    /**
-     * Get the Imageprovider
-     * @return String url
-     */
-    public function getSource()
+    public function getImageDescription(): string
+    {
+        return $this->imageDescription;
+    }
+
+    public function getImageAuthor(): string
+    {
+        return $this->imageAuthor;
+    }
+
+    public function getSource(): string
     {
         return $this->source;
     }
 
+    public function getImageDate(): string
+    {
+        return $this->imageDate;
+    }
+
+    public function getLicense(): string
+    {
+        return $this->license;
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'imageUrl' => $this->imageUrl,
+            'attributionUrl' => $this->attributionUrl,
+            'description' => $this->imageDescription,
+            'author' => $this->imageAuthor,
+            'source' => $this->source,
+            'imageDate' => $this->imageDate,
+            'license' => $this->license,
+        ];
+    }
+
+    public static function fromArray(array $data): self
+    {
+        $get = static fn (string $key): string => is_string($data[$key] ?? null) ? $data[$key] : '';
+        return new self(
+            $get('imageUrl'),
+            $get('attributionUrl'),
+            $get('description'),
+            $get('author'),
+            $get('source'),
+            $get('imageDate'),
+            $get('license'),
+        );
+    }
 }

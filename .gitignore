@@ -1,5 +1,9 @@
-build
-node_modules
-unsplash
-/test-results/
-/playwright-report/
+vendor/
+node_modules/
+build/
+/releases/
+# local maintainer tooling and notes (not published)
+/LOCAL.md
+/.deploy.env
+/scripts/
+/tests/

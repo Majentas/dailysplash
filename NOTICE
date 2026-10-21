@@ -1,0 +1,31 @@
+DailySplash
+===========
+
+DailySplash (Nextcloud app id "dailysplash") is a MODIFIED version of
+"Splash" (Nextcloud app id "unsplash"), https://github.com/nextcloud/unsplash
+
+Original work:
+  Conception: Jan-Christoph Borchardt and Lukas Reschke
+  Development and maintenance: Felix Nüsse, Marius Wieschollek
+  Bing Wallpaper provider: Bruce Mubangwa
+  and the other contributors listed in the upstream git history.
+
+Both the original work and this modified version are licensed under the
+GNU Affero General Public License, version 3 or (at your option) any later
+version. See LICENSE.md. Original copyright notices are kept in the source
+files; files changed for DailySplash say so in their header.
+
+Modifications (2026), starting from upstream commit 5aa215d (3.2.0-dev):
+  - renamed app id, namespace (OCA\DailySplash), routes, settings keys,
+    app data folder, CSS classes and l10n domain so that it can coexist
+    with the original app;
+  - targets Nextcloud 35 / PHP 8.5, uses only public OCP APIs;
+  - images are downloaded server side by a background job (with timeouts,
+    size and type checks) and served by Nextcloud itself; the browser never
+    contacts the image provider;
+  - removed the Unsplash API, Wallhaven and random Wikimedia providers.
+
+DailySplash is not affiliated with or endorsed by Nextcloud GmbH, Unsplash,
+Microsoft (Bing) or the Wikimedia Foundation. The images shown remain the
+property of their authors and are used under their respective licences;
+the attribution box on the login page links to each image's source.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /**
  * @copyright Copyright (c) 2019 Felix Nüsse <felix.nuesse@t-online.de>
+ * Modified for DailySplash in 2026 (see NOTICE).
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -22,227 +23,108 @@ declare(strict_types=1);
  *
  */
 
-namespace OCA\Unsplash\ProviderHandler;
+namespace OCA\DailySplash\ProviderHandler;
 
-use OCP\Files\IAppData;
 use OCP\Http\Client\IClientService;
-use OCP\IConfig;
 use Psr\Log\LoggerInterface;
-use OCP\Files\NotFoundException;
 
+/**
+ * A provider only tells DailySplash which image is "today's" image.
+ * Downloading, validating and caching is done by ImageCacheService, and
+ * page requests never call a provider.
+ */
 abstract class Provider
 {
+    public const USER_AGENT = 'DailySplash/1.0 (Nextcloud app; server-side daily background fetch)';
+    public const JSON_TIMEOUT = 10;
+    public const JSON_MAX_BYTES = 1024 * 1024;
 
-    const SIZE_SMALL = 0;
-    const SIZE_NORMAL = 1;
-    const SIZE_HIGH = 2;
-    const SIZE_ULTRA = 3;
-    /**
-     * // Please override this value for your own provider.
-     * @var string
-     */
-    public string $DEFAULT_SEARCH = "nature";
-    public bool $ALLOW_CUSTOMIZING = true;
-    public bool $REQUIRES_AUTH = false;
-    public string $DEFAULT_TOKEN = "";
-    public bool $IS_CACHED = false;
-    public string $CACHED_URL = "/index.php/apps/unsplash/api/image";
-    public string $DEFAULT_METADATA_URL="";
-
-    /**
-     * Provider constructor.
-     *
-     * @param $appName
-     * @param LoggerInterface $logger
-     * @param IConfig $config
-     * @param IAppData $appData
-     * @param string $providerName
-     * @param IClientService $clientService
-     */
     public function __construct(
-        protected string $appName,
-        protected LoggerInterface $logger,
-        protected IConfig $config,
-        protected IAppData $appData,
-        protected string $providerName,
         protected IClientService $clientService,
+        protected LoggerInterface $logger,
     )
     {
     }
 
     /**
-     * This sets a custom search query if the provider supports this.
-     *
-     * @param string $term
+     * Stable identifier, used in settings and as app data folder name.
      */
-    public function setCustomSearchTerms(string $term): void
-    {
-        if ($this->ALLOW_CUSTOMIZING) {
-            $this->config->setAppValue($this->appName, 'splash/provider/' . $this->providerName . '/searchterms', $term);
-        }
-    }
+    abstract public function getId(): string;
 
     /**
-     *
-     * This returns a single searchterm. It will be restricted to letters, and lowercase.
-     * This filtering i s there to prevent url hijacking or malforming due to searchterms
-     * @return string
+     * Human readable name, shown in the admin settings and the attribution box.
      */
-    public function getRandomSearchTerm(): string
-    {
-        $termarray = explode(",", $this->getCustomSearchterms());
-        shuffle($termarray);
-
-        $term = strtolower($termarray[0]);
-        // only allow letters as searchterm
-        $term = preg_replace('/[^a-z-]/i','', $term);
-        return $term;
-    }
+    abstract public function getName(): string;
 
     /**
-     *
-     * This returns the custom searchterm
-     * It is not filtered!
-     * @return string
+     * Whether this provider delivers images that DailySplash caches and serves.
+     * The "Nextcloud default" provider does not: it leaves the login page alone.
      */
-    public function getCustomSearchterms(): string
-    {
-        if (!$this->ALLOW_CUSTOMIZING) {
-            return "";
-        }
-        $term = $this->config->getAppValue($this->appName, 'splash/provider/' . $this->providerName . '/searchterms', $this->DEFAULT_SEARCH);
-        if ($term == "") {
-            return $this->DEFAULT_SEARCH;
-        }
-        return $term;
-    }
-
-    /**
-     * Returns the providername
-     * @return string
-     */
-    public function getName(): string
-    {
-        return $this->providerName;
-    }
-
-    /**
-     * Returns if the provider is customizable
-     * @return string
-     */
-    public function isCustomizable(): bool
-    {
-        return $this->ALLOW_CUSTOMIZING;
-    }
-
-    /**
-     * Returns if the provider requires an api token
-     * @return string
-     */
-    public function requiresAuth(): bool
-    {
-        return $this->REQUIRES_AUTH;
-    }
-
-    /**
-     *
-     * This returns the token.
-     * It either returns the default or the stored token.
-     *
-     * @return string
-     */
-    public function getToken(): string
-    {
-        if (!$this->REQUIRES_AUTH) {
-            return "";
-        }
-        $token = $this->config->getAppValue($this->appName, 'splash/provider/' . $this->providerName . '/token', $this->DEFAULT_TOKEN);
-        return $token;
-    }
-
     public function isCached(): bool
     {
-        return $this->IS_CACHED;
+        return true;
     }
 
     /**
-     */
-    public function getCachedImageURL(): string
-    {
-        return $this->CACHED_URL;
-    }
-
-    /**
-     */
-    public function getMetadata(): ProviderMetadata
-    {
-        return new ProviderMetadata($this->DEFAULT_METADATA_URL, $this->DEFAULT_METADATA_URL, "", "", $this->providerName);
-    }
-
-    /**
-     * fetches a background to be cached
-     */
-    public function fetchCached()
-    {
-
-    }
-
-    /**
-     * Deletes the currently cached background
-     */
-    public function deleteCached()
-    {
-
-    }
-
-    /*
-     * This should return all URLS which need to be whitelisted for csrf
-     */
-    public abstract function getWhitelistResourceUrls();
-
-
-    /*
-     * This should return a url to a random image
-     */
-    public abstract function getRandomImageUrl($size);
-
-    /*
-     * This should return a url to a random image filtered by $search
-     */
-    public abstract function getRandomImageUrlBySearchTerm($search, $size);
-
-
-    /**
-     * Fetch data from a remote URL using the Nextcloud HTTP client.
+     * Hosts that the image itself may be downloaded from (https only).
      *
-     * @param string $host
-     * @return string|false Response body, or false on failure
+     * @return string[]
      */
-    protected function getData(string $host): string|false
+    abstract public function getAllowedImageHosts(): array;
+
+    /**
+     * Look up today's image (metadata only, no image download).
+     *
+     * @param \DateTimeImmutable $today current date in UTC
+     * @return ProviderMetadata|null null if the provider could not be reached or returned garbage
+     */
+    abstract public function resolveDailyImage(\DateTimeImmutable $today): ?ProviderMetadata;
+
+    /**
+     * Fetch and decode a small JSON document from the provider API.
+     */
+    protected function getJson(string $url): ?array
     {
         try {
             $client = $this->clientService->newClient();
-            $response = $client->get($host);
-            return $response->getBody();
+            $response = $client->get($url, [
+                'timeout' => self::JSON_TIMEOUT,
+                'connect_timeout' => 5,
+                'allow_redirects' => false,
+                'headers' => [
+                    'User-Agent' => self::USER_AGENT,
+                    'Accept' => 'application/json',
+                ],
+            ]);
+            $body = (string)$response->getBody();
         } catch (\Exception $e) {
-            $this->logger->warning('Failed to fetch data from ' . $host . ': ' . $e->getMessage());
-            return false;
+            $this->logger->warning('DailySplash: ' . $this->getName() . ' API request failed: ' . $e->getMessage(), ['app' => 'dailysplash']);
+            return null;
         }
-    }
 
+        if (strlen($body) > self::JSON_MAX_BYTES) {
+            $this->logger->warning('DailySplash: ' . $this->getName() . ' API response too large', ['app' => 'dailysplash']);
+            return null;
+        }
+
+        $json = json_decode($body, true);
+        if (!is_array($json)) {
+            $this->logger->warning('DailySplash: ' . $this->getName() . ' API returned invalid JSON', ['app' => 'dailysplash']);
+            return null;
+        }
+        return $json;
+    }
 
     /**
-     * This doesnt really belong here. I should create a utils class or something like it
-     * @throws NotPermittedException
+     * Strip HTML (Wikimedia metadata is HTML) and collapse whitespace.
      */
-    protected function getImageFolder()
+    protected static function plainText(?string $html, int $maxLength = 300): string
     {
-        try {
-            $rootFolder = $this->appData->getFolder($this->providerName);
-        } catch (NotFoundException $e) {
-            $rootFolder = $this->appData->newFolder($this->providerName);
+        $text = html_entity_decode(strip_tags((string)$html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = trim((string)preg_replace('/\s+/u', ' ', $text));
+        if (mb_strlen($text) > $maxLength) {
+            $text = mb_substr($text, 0, $maxLength - 1) . '…';
         }
-        return $rootFolder;
+        return $text;
     }
-
 }

@@ -5,35 +5,34 @@ declare(strict_types=1);
 /**
  * This file is part of the Unsplash App
  * and licensed under the AGPL.
+ *
+ * Modified for DailySplash (see NOTICE).
  */
 
-namespace OCA\Unsplash\Cron;
+namespace OCA\DailySplash\Cron;
 
-use OCA\Unsplash\Services\FetchService;
+use OCA\DailySplash\Services\ImageCacheService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
-use Psr\Log\LoggerInterface;
 
+/**
+ * Runs hourly but only downloads when the cached image is not today's yet,
+ * so a failed fetch is retried an hour later while the old image stays.
+ */
 class ImageProviderBackgroundFetch extends TimedJob
 {
     public function __construct(
         ITimeFactory $time,
-        private FetchService $fetchService,
-        private LoggerInterface $logger,
+        private ImageCacheService $imageCache,
     )
     {
         parent::__construct($time);
-        $this->logger->info("Initialize ImageProviderBackgroundFetch");
-
-        // Run once a day
-        $this->setInterval(24 * 3600);
+        $this->setInterval(3600);
+        $this->setAllowParallelRuns(false);
     }
 
-    protected function run($arguments)
+    protected function run($argument): void
     {
-        $this->logger->info("ImageProviderBackgroundFetch: start fetch-service");
-        $this->fetchService->fetch();
-        $this->logger->info("ImageProviderBackgroundFetch: ended fetch-service");
+        $this->imageCache->refresh();
     }
-
 }

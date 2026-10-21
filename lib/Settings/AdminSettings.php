@@ -5,11 +5,15 @@ declare(strict_types=1);
 /**
  * This file is part of the Unsplash App
  * and licensed under the AGPL.
+ *
+ * Modified for DailySplash (see NOTICE).
  */
 
-namespace OCA\Unsplash\Settings;
+namespace OCA\DailySplash\Settings;
 
-use OCA\Unsplash\Services\SettingsService;
+use OCA\DailySplash\AppInfo\Application;
+use OCA\DailySplash\Services\ImageCacheService;
+use OCA\DailySplash\Services\SettingsService;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IURLGenerator;
 use OCP\Settings\ISettings;
@@ -17,19 +21,14 @@ use OCP\Settings\ISettings;
 /**
  * Class AdminSettings
  *
- * @package OCA\Unsplash\Settings
+ * @package OCA\DailySplash\Settings
  */
 class AdminSettings implements ISettings
 {
-    /**
-     * AdminSection constructor.
-     *
-     * @param IURLGenerator $urlGenerator
-     * @param SettingsService $settings
-     */
     public function __construct(
         private IURLGenerator $urlGenerator,
         private SettingsService $settings,
+        private ImageCacheService $imageCache,
     )
     {
     }
@@ -39,27 +38,28 @@ class AdminSettings implements ISettings
      */
     public function getForm(): TemplateResponse
     {
-        return new TemplateResponse('unsplash', 'settings/admin', [
-            'saveSettingsUrl' => $this->urlGenerator->linkToRouteAbsolute('unsplash.admin_settings.set'),
-            'requestCustomizationUrl' =>
-                $this->urlGenerator->linkToRouteAbsolute(
-                    'unsplash.admin_settings.getCustomization',
-                    array('providername' => $this->settings->getImageProviderName())
-                ),
+        $providers = [];
+        foreach ($this->settings->getAllImageProviders() as $id => $provider) {
+            $providers[$id] = $provider->getName();
+        }
+        $current = $this->imageCache->getCurrent();
+        $lastAttempt = $this->settings->getLastFetchAttempt();
+
+        return new TemplateResponse(Application::APP_ID, 'settings/admin', [
+            'saveSettingsUrl' => $this->urlGenerator->linkToRoute('dailysplash.admin_settings.set'),
             'styleLogin' => $this->settings->getServerStyleLoginEnabled(),
             'styleDashboard' => $this->settings->getServerStyleDashboardEnabled(),
-            // Dashboard was introduced in NC20; always available in supported range NC31+
-            'hasDashboard' => true,
-            'availableProvider' => $this->settings->getAllImageProvider(),
-            'selectedProvider' => $this->settings->getImageProviderName(),
-            'availableCustomizations' => $this->settings->getAllCustomizableImageProvider(),
-            'selectionCustomization' => $this->settings->getImageProviderCustomization(),
+            'availableProviders' => $providers,
+            'selectedProvider' => $this->settings->getImageProviderId(),
+            'isCached' => $this->settings->getSelectedImageProvider()->isCached(),
+            'imageURL' => $current === null ? '' : $this->urlGenerator->linkToRoute('dailysplash.image.get', ['v' => $current['version']]),
+            'imageDate' => $current === null ? '' : $current['metadata']->getImageDate(),
+            'lastAttempt' => $lastAttempt > 0 ? gmdate('Y-m-d H:i', $lastAttempt) . ' UTC' : '',
+            'lastError' => $this->settings->getLastFetchError(),
             'styleTint' => $this->settings->isTintEnabled(),
             'styleStrengthColor' => $this->settings->getColorStrength(),
             'styleStrengthBlur' => $this->settings->getBlurStrength(),
             'styleHighVisibility' => $this->settings->isHighVisibilityLogin(),
-            'isCached' => $this->settings->isCached(),
-            'imageURL' => $this->settings->getSelectedImageProvider()->getCachedImageURL()
         ]);
     }
 

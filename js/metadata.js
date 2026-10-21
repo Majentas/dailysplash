@@ -1,93 +1,67 @@
+/**
+ * This file is part of the Unsplash App
+ * and licensed under the AGPL.
+ *
+ * Modified for DailySplash (see NOTICE).
+ */
 (function () {
     function initialize() {
-        loadMetadata()
-    }
-
-    /**
-     * @private
-     */
-    function loadMetadata() {
-
-        var metadata = OC.generateUrl('/apps/unsplash/api/metadata');
-        let headers = {
+        fetch(OC.generateUrl('/apps/dailysplash/metadata'), {
             method: 'GET',
-            headers: {
-                'requesttoken': OC.requestToken,
-                'Accept': 'application/json'
-            }
-        }
-
-        let request = new Request(metadata);
-
-        fetch(request, headers)
-            .then(response => response.json())
-            .then(data => {
-                console.log(data)
-                addMetadataToDOM(data)
+            headers: {'Accept': 'application/json'},
+        })
+            .then((response) => response.ok ? response.json() : null)
+            .then((data) => {
+                if (data && data.source) {
+                    addMetadataToDOM(data);
+                }
             })
             .catch((e) => {
                 console.error(e);
             });
     }
 
-
-    function addMetadataToDOM(data) {
-
-        if(data.source == "Nextcloud Image") {
-            return
-        }
-
-        let div = document.createElement("div");
-        let info = document.createElement("div");
-        let source = document.createElement("p");
-        let description = document.createElement("p");
-        let author = document.createElement("p");
-        let goto = document.createElement("a");
-
-
-        // First, prepare all styles
-        source.classList = "unsplash-metadata-text unsplash-metadata-title"
-        author.classList = "unsplash-metadata-text"
-        description.classList = "unsplash-metadata-text"
-        info.classList = "unsplash-icon-info"
-        //dash-panel for dashboard, guest-box for login
-        div.classList = "dash-panel guest-box unsplash-floating-bottom-right"
-
-
-        // Third, add links
-        div.href = data.attribution
-
-
-        // Last: Add content to main div and body
-
-        source.textContent = data.source + ":"
-        if (!data.description) {
-            if (!data.author) {
-                source.textContent = data.source
-            }
-        }
-        goto.appendChild(source)
-
-        if (data.description) {
-            description.textContent = data.description
-            goto.appendChild(description)
-        }
-
-        if (data.author) {
-            author.textContent = "- " + data.author
-            goto.appendChild(author)
-        }
-
-        goto.href = data.attribution
-
-
-        // Now append both to main div
-        div.appendChild(info)
-        div.appendChild(goto)
-
-        document.getElementsByTagName("body")[0].appendChild(div)
+    function paragraph(text, extraClass) {
+        const p = document.createElement('p');
+        p.className = 'dailysplash-metadata-text' + (extraClass ? ' ' + extraClass : '');
+        p.textContent = text;
+        return p;
     }
 
+    /**
+     * Attribution box (bottom right). Only text and an outbound link the visitor
+     * may click: nothing is loaded from the provider.
+     */
+    function addMetadataToDOM(data) {
+        const div = document.createElement('div');
+        const info = document.createElement('div');
+        const link = document.createElement('a');
 
-    initialize();
+        //dash-panel for dashboard, guest-box for login
+        div.className = 'dash-panel guest-box dailysplash-floating-bottom-right';
+        info.className = 'dailysplash-icon-info';
+
+        link.appendChild(paragraph(data.source + ((data.description || data.author) ? ':' : ''), 'dailysplash-metadata-title'));
+        if (data.description) {
+            link.appendChild(paragraph(data.description));
+        }
+        if (data.author || data.license) {
+            link.appendChild(paragraph('- ' + [data.author, data.license].filter(Boolean).join(' · ')));
+        }
+        if (typeof data.attribution === 'string' && data.attribution.startsWith('https://')) {
+            link.href = data.attribution;
+            link.target = '_blank';
+            link.rel = 'noreferrer noopener';
+        }
+
+        div.appendChild(info);
+        div.appendChild(link);
+        document.body.appendChild(div);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
 })();

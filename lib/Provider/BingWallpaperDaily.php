@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * @copyright Copyright (c) 2024 Bruce Truth | Bruce Mubangwa <bruce@broosaction.com>
+ * Modified for DailySplash in 2026 (see NOTICE).
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -20,69 +23,70 @@
  *
  */
 
-namespace OCA\Unsplash\Provider;
+namespace OCA\DailySplash\Provider;
 
-use OCA\Unsplash\ProviderHandler\Provider;
+use OCA\DailySplash\ProviderHandler\Provider;
+use OCA\DailySplash\ProviderHandler\ProviderMetadata;
 
 class BingWallpaperDaily extends Provider
 {
-    /**
-     * Indicates whether customization is allowed.
-     * @var bool
-     */
-    public bool $ALLOW_CUSTOMIZING = false;
+    public const ID = 'bing';
+    private const HOST = 'www.bing.com';
+    private const API_URL = 'https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US';
 
-    /**
-     * Indicates if images are cached.
-     * @var bool
-     */
-    public bool $IS_CACHED = true;
-
-    /**
-     * Default metadata URL for Bing wallpapers.
-     * @var string
-     */
-    public string $DEFAULT_METADATA_URL = 'https://www.bing.com';
-
-
-    /**
-     * Get URLs that are allowed for the Bing wallpaper.
-     *
-     * @return array
-     */
-    public function getWhitelistResourceUrls(): array
+    public function getId(): string
     {
-        return ['https://www.bing.com'];
+        return self::ID;
     }
 
-    /**
-     * Provide a cached image URL or the latest Bing daily wallpaper.
-     *
-     * @return string
-     */
-    public function getCachedImageURL(): string
+    public function getName(): string
     {
-        return $this->getRandomImageUrl("");
+        return 'Bing Wallpaper - Picture of the Day';
     }
 
-    public function getRandomImageUrl($size)
+    public function getAllowedImageHosts(): array
     {
-        return $this->getRandomImageUrlBySearchTerm($this->getRandomSearchTerm(), $size);
+        return [self::HOST];
     }
 
-    public function getRandomImageUrlBySearchTerm($search, $size)
+    public function resolveDailyImage(\DateTimeImmutable $today): ?ProviderMetadata
     {
-        // Fetch the daily image JSON from Bing
-        $bing_daily_image_json = $this->getData('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US');
-        if ($bing_daily_image_json !== false) {
-            $matches = json_decode($bing_daily_image_json);
-            if (isset($matches->images[0]->url)) {
-                // If unable to encode, return the image URL
-                return 'https://www.bing.com' . $matches->images[0]->url;
-            }
+        $json = $this->getJson(self::API_URL);
+        $image = $json['images'][0] ?? null;
+        if (!is_array($image)) {
+            $image = [];
+        }
+        $urlBase = $image['urlbase'] ?? null;
+        if (!is_string($urlBase) || !str_starts_with($urlBase, '/th?id=')) {
+            $this->logger->warning('DailySplash: Bing returned no usable image', ['app' => 'dailysplash']);
+            return null;
         }
 
-        // Return default image if no Bing image is found
-        return (new NextcloudImage($this->appName, $this->logger, $this->config, $this->appData, "Nextcloud", $this->clientService))->getRandomImageUrl($size);
+        // Bing publishes per market day; startdate is YYYYMMDD
+        $date = \DateTimeImmutable::createFromFormat('!Ymd', (string)($image['startdate'] ?? ''));
+        $imageDate = $date !== false ? $date->format('Y-m-d') : $today->format('Y-m-d');
+
+        // "Description, Place (© Author/Agency)"
+        $copyright = (string)($image['copyright'] ?? '');
+        $description = $copyright;
+        $author = '';
+        if (preg_match('/^(.*?)\s*\((©[^)]*)\)\s*$/u', $copyright, $m)) {
+            $description = $m[1];
+            $author = $m[2];
+        }
+
+        $attribution = (string)($image['copyrightlink'] ?? '');
+        if (parse_url($attribution, PHP_URL_SCHEME) !== 'https' || parse_url($attribution, PHP_URL_HOST) !== self::HOST) {
+            $attribution = 'https://' . self::HOST . '/';
+        }
+
+        return new ProviderMetadata(
+            'https://' . self::HOST . $urlBase . '_1920x1080.jpg',
+            $attribution,
+            self::plainText($description),
+            self::plainText($author, 120),
+            $this->getName(),
+            $imageDate,
+        );
     }
 }

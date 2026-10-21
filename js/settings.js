@@ -1,173 +1,103 @@
+/**
+ * This file is part of the Unsplash App
+ * and licensed under the AGPL.
+ *
+ * Modified for DailySplash (see NOTICE).
+ */
 (function () {
+    const timers = {};
+    let saveUrl;
+
     function initialize() {
-        this._timer = [];
-        this.saveUrl = document.getElementById('unsplash-settings').dataset.save;
+        const root = document.getElementById('dailysplash-settings');
+        if (!root) {
+            return;
+        }
+        saveUrl = root.dataset.save;
 
-        let customizationInputText = document.getElementById('splash-provider-customization');
-        customizationInputText.onkeydown = function (e) {
-            if (e.keyCode === 13) {
-                let key = e.target.dataset.setting,
-                    value = e.target.value,
-                    type = e.target.getAttribute('type');
-                _setValue(key, value, type);
-                e.preventDefault();
-            }
-            return true;
-        };
+        document.getElementById('dailysplash-refresh').addEventListener('click', (e) => {
+            e.target.disabled = true;
+            setValue('refresh', true).finally(() => {
+                e.target.disabled = false;
+            });
+        });
 
-        let refreshCacheButton = document.getElementById('splash-provider-refresh-cache');
-        refreshCacheButton.onclick = function (e) {
-            _setValue(refreshCacheButton.dataset.setting)
-            return true;
-        };
+        for (const setting of document.querySelectorAll('#dailysplash-settings [data-setting]')) {
+            setting.addEventListener('change', (e) => {
+                const key = e.target.dataset.setting;
+                const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
 
-        let settings = document.querySelectorAll('[data-setting]');
-        for (let setting of settings) {
-            setting.addEventListener(
-                'change',
-                (e) => {
-                    let key = e.target.dataset.setting,
-                        value = e.target.value,
-                        type = e.target.getAttribute('type');
-
-                    if (type === 'checkbox') {
-                        value = e.target.checked ? 'true' : 'false';
-                    }
-
-                    if (type === 'select') {
-                        value = e.target.value;
-                    }
-
-                    if (key === 'style/tint') {
-                        let enable = false
-                        if (value === "true") {
-                            enable = true
-                        }
-                        document.getElementById('unsplash-style-color-strength').disabled = !enable;
-                    }
-
-                    _setValue(key, value, type);
+                if (key === 'style/tint') {
+                    document.getElementById('dailysplash-style-color-strength').disabled = !value;
                 }
-            );
+                setValue(key, value);
+            });
         }
     }
 
     /**
      * Update configuration value
-     *
-     * @param key
-     * @param value
-     * @private
      */
-    function _setValue(key, value, type) {
-
-        let headers = {
+    function setValue(key, value) {
+        return fetch(saveUrl, {
             method: 'POST',
+            redirect: 'error',
             headers: {
                 'requesttoken': OC.requestToken,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-            }
-        }
-
-        let body = JSON.stringify({key, value})
-        let options = {headers, body, method: 'POST', redirect: 'error'}
-        let request = new Request(this.saveUrl, options);
-
-        fetch(request, headers)
-            .then(response=> {
-                _showMessage('success');
-                if (type === 'select') {
-                    getCustomization(value)
+            },
+            body: JSON.stringify({key, value}),
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
                 }
-                response.json().then( data => {
-                    if(data.hasOwnProperty("isCached")) {
-                        if(data.isCached) {
-                            document.getElementById('splash-provider-refresh-cache').style.display = null;
-                        } else {
-                            document.getElementById('splash-provider-refresh-cache').style.display = "none";
-                        }
-                    }
-
-                    if(data.hasOwnProperty("provider")) {
-                        let token = document.getElementById('unsplash-providertoken')
-                        if(data.provider === "UnsplashAPI") {
-                            token.style.display = null;
-                        } else {
-                            token.style.display = "none";
-                        }
-                    }
-
-                    if(data.hasOwnProperty("imageURL")) {
-                        let preview = document.getElementById("unsplash-preview")
-                        preview.src = data.imageURL
-
-                    }
-
-                })
+                return response.json();
+            })
+            .then((data) => {
+                showState(data);
+                showMessage(data.lastError && key === 'refresh' ? 'error' : 'success');
             })
             .catch((e) => {
                 console.error(e);
-                _showMessage('error');
+                showMessage('error');
             });
     }
 
-    /**
-     * Update configuration value
-     *
-     * @param key
-     * @param value
-     * @private
-     */
-    function getCustomization(providername) {
-        let headers = {
-            method: 'GET',
-            headers: {
-                'requesttoken': OC.requestToken,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-            }
+    function showState(data) {
+        document.getElementById('dailysplash-cache').hidden = !data.isCached;
+        for (const source of document.querySelectorAll('.dailysplash-source')) {
+            source.hidden = source.dataset.provider !== data.provider;
         }
 
-        let updateCustomizationUrl = document.getElementById('unsplash-settings').dataset.requestupdate
+        const preview = document.getElementById('dailysplash-preview');
+        preview.hidden = !data.imageURL;
+        if (data.imageURL) {
+            preview.src = data.imageURL;
+        }
+        document.getElementById('dailysplash-image-date').textContent = data.imageDate || '—';
 
-        //todo: build this url better.
-        let apiUrl = updateCustomizationUrl.substr(0, updateCustomizationUrl.lastIndexOf("/") + 1);
-        let options = {headers, method: 'GET', redirect: 'error'}
-        let request = new Request(apiUrl + providername, options);
-
-        fetch(request, headers)
-            .then(res =>
-                res.json())
-            .then(data => {
-                document.getElementById('splash-provider-customization').value = data['customization'];
-            })
-            .then(() => {
-                _showMessage('success');
-            })
-            .catch((e) => {
-                console.error(e);
-                _showMessage('error');
-            });
+        const error = document.getElementById('dailysplash-last-error');
+        error.hidden = !data.lastError;
+        error.querySelector('span').textContent = data.lastError || '';
     }
 
     /**
      * Show save success/fail message
-     *
-     * @param type
-     * @private
      */
-    function _showMessage(type) {
-        let element = document.querySelector(`#unsplash-settings .msg.${type}`);
-
-        element.classList.remove('active');
+    function showMessage(type) {
+        const element = document.querySelector(`#dailysplash-settings .msg.${type}`);
         element.classList.add('active');
-
-        clearTimeout(this._timer[type]);
-        this._timer[type] = setTimeout(() => {
+        clearTimeout(timers[type]);
+        timers[type] = setTimeout(() => {
             element.classList.remove('active');
         }, 1000);
     }
 
-    initialize();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
 })();

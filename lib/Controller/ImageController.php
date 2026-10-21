@@ -5,101 +5,82 @@ declare(strict_types=1);
 /**
  * This file is part of the Unsplash App
  * and licensed under the AGPL.
+ *
+ * Modified for DailySplash (see NOTICE).
  */
 
-namespace OCA\Unsplash\Controller;
+namespace OCA\DailySplash\Controller;
 
-use OCA\Unsplash\Services\FetchService;
-use OCA\Unsplash\Services\SettingsService;
+use OCA\DailySplash\Services\ImageCacheService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
-use OCP\AppFramework\Http\DataDisplayResponse;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
+use OCP\AppFramework\Http\Attribute\NoSameSiteCookieRequired;
+use OCP\AppFramework\Http\Attribute\NoTwoFactorRequired;
+use OCP\AppFramework\Http\Attribute\PublicPage;
 use OCP\AppFramework\Http\FileDisplayResponse;
 use OCP\AppFramework\Http\JSONResponse;
-use OCP\AppFramework\Utility\ITimeFactory;
-use OCP\BackgroundJob\IJobList;
-use OCP\Files\IAppData;
+use OCP\AppFramework\Http\NotFoundResponse;
+use OCP\AppFramework\Http\Response;
 use OCP\IRequest;
 
 /**
- * Class ImageController
+ * Serves the cached image: visitors only ever talk to this Nextcloud.
  *
- * @package OCA\Unsplash\Controller
+ * @package OCA\DailySplash\Controller
  */
 class ImageController extends Controller
 {
-    /**
-     * ImageController constructor.
-     *
-     * @param                 $appName
-     * @param IRequest $request
-     * @param SettingsService $settings
-     * @param ITimeFactory $timeFactory
-     */
     public function __construct(
-        $appName,
+        string $appName,
         IRequest $request,
-        private SettingsService $settings,
-        private ITimeFactory $timeFactory,
-        private IAppData $appData,
-        private FetchService $service,
+        private ImageCacheService $imageCache,
     )
     {
         parent::__construct($appName, $request);
     }
 
-    /**
-     * @NoCSRFRequired
-     * @PublicPage
-     * @NoSameSiteCookieRequired
-     * @NoTwoFactorRequired
-     *
-     * @return FileDisplayResponse
-     */
-    public function get(): FileDisplayResponse
+    #[PublicPage]
+    #[NoCSRFRequired]
+    #[NoSameSiteCookieRequired]
+    #[NoTwoFactorRequired]
+    public function get(string $v = ''): Response
     {
-        $providername = $this->settings->getSelectedImageProvider()->getName();
-        $appdataFolder = $this->appData->getFolder($providername);
-        $file = $appdataFolder->getFile("background.jpeg");
+        $current = $this->imageCache->getCurrent();
+        if ($current === null) {
+            return new NotFoundResponse();
+        }
 
-        return new FileDisplayResponse($file, Http::STATUS_OK, ['Content-Type' => 'image/jpeg']);
+        $response = new FileDisplayResponse($current['file'], Http::STATUS_OK, ['Content-Type' => $current['mime']]);
+        if ($v === $current['version']) {
+            // versioned URL: content behind it never changes
+            $response->cacheFor(365 * 86400, true, true);
+        } else {
+            $response->cacheFor(3600, true);
+        }
+        return $response;
     }
 
-    /**
-     * @NoCSRFRequired
-     * @PublicPage
-     * @NoSameSiteCookieRequired
-     * @NoTwoFactorRequired
-     *
-     * @return JSONResponse
-     */
-    public function getMetadata(): JSONResponse
+    #[PublicPage]
+    #[NoCSRFRequired]
+    #[NoSameSiteCookieRequired]
+    #[NoTwoFactorRequired]
+    public function metadata(): JSONResponse
     {
-        $provider = $this->settings->getSelectedImageProvider();
-        $metadata = $provider->getMetadata();
-
-        return new JSONResponse(
-            [
-                'url' => $metadata->getImageUrl(), 
-                'author' => $metadata->getImageAuthor(),
-                'attribution' => $metadata->getAttributionUrl(),
-                'description' => $metadata->getImageDescription(),
-                'source' => $metadata->getSource()
-            ]
-        );
+        $current = $this->imageCache->getCurrent();
+        if ($current === null) {
+            return new JSONResponse([], Http::STATUS_NOT_FOUND);
+        }
+        $metadata = $current['metadata'];
+        $response = new JSONResponse([
+            'source' => $metadata->getSource(),
+            'description' => $metadata->getImageDescription(),
+            'author' => $metadata->getImageAuthor(),
+            'license' => $metadata->getLicense(),
+            'attribution' => $metadata->getAttributionUrl(),
+            'date' => $metadata->getImageDate(),
+        ]);
+        $response->cacheFor(3600, true);
+        return $response;
     }
-
-    /**
-     * Creates the appropriate css response for the client.
-     * Also:
-     * see https://github.com/juliushaertl/theming_customcss/blob/master/lib/Controller/ThemingController.php
-     *
-     * @param String $css
-     * @return DataDisplayResponse
-     */
-    private function prepareResponse(string $css): DataDisplayResponse
-    {
-        return new DataDisplayResponse($css, Http::STATUS_OK, ['Content-Type' => 'text/css']);
-    }
-
 }

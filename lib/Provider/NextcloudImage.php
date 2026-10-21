@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * @copyright Copyright (c) 2019 Felix Nüsse <felix.nuesse@t-online.de>
+ * Modified for DailySplash in 2026 (see NOTICE).
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -20,29 +23,40 @@
  *
  */
 
-namespace OCA\Unsplash\Provider;
+namespace OCA\DailySplash\Provider;
 
-use OCA\Unsplash\ProviderHandler\Provider;
+use OCA\DailySplash\ProviderHandler\Provider;
+use OCA\DailySplash\ProviderHandler\ProviderMetadata;
 
+/**
+ * Keeps the background configured in the theming app (no override at all).
+ */
 class NextcloudImage extends Provider
 {
+    public const ID = 'nextcloud';
 
-    // Todo: Use URLGenerator. See AdminSettingsController
-    public bool $ALLOW_CUSTOMIZING = false;
-    private string $THEMING_URL = "/index.php/apps/theming/image/background";
+    public function getId(): string
+    {
+        return self::ID;
+    }
 
-    public function getWhitelistResourceUrls(): array
+    public function getName(): string
+    {
+        return 'Nextcloud Image';
+    }
+
+    public function isCached(): bool
+    {
+        return false;
+    }
+
+    public function getAllowedImageHosts(): array
     {
         return [];
     }
 
-    public function getRandomImageUrl($size): string
+    public function resolveDailyImage(\DateTimeImmutable $today): ?ProviderMetadata
     {
-        return $this->THEMING_URL;
-    }
-
-    public function getRandomImageUrlBySearchTerm($search, $size): string
-    {
-        return $this->THEMING_URL;
+        return null;
     }
 }

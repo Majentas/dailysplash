@@ -1,5 +1,31 @@
 # Changelog
 
+All notable changes to DailySplash. The history of the original Splash app
+(`unsplash`) is kept below for reference.
+
+## 1.0.0 - 2026-10-21
+
+First release of the DailySplash fork (based on upstream Splash 3.2.0-dev, commit 5aa215d).
+
+### Changed
+* Renamed to DailySplash: app id `dailysplash`, namespace `OCA\DailySplash`, new routes, settings keys, app data folder, CSS classes and l10n domain.
+* Requires Nextcloud 35 and PHP 8.2 or newer (tested with PHP 8.5).
+* Settings use the typed `IAppConfig` / `IUserConfig` APIs; controller annotations replaced by PHP attributes; no private `OC\` classes.
+* Bing and Wikimedia Commons picture of the day are now downloaded server side by an hourly background job (only when the cached image is not today's), with timeouts, a 15 MB limit, host allow-list and image type check, and served by Nextcloud. Visitors' browsers never contact the providers, so no CSP exception is needed anymore.
+* If a provider fails, the previous image stays in place and the job retries an hour later.
+* Default provider is Bing; login page enabled, dashboard disabled by default.
+* Admin settings show the image date, last check and last error, and can download today's image on demand.
+
+### Added
+* `occ dailysplash:fetch [--force]`.
+
+### Removed
+* Unsplash API, Wallhaven and random Wikimedia providers, keyword and token settings, personal settings notice, CSP listener.
+
+---
+
+# Upstream Splash changelog
+
 ## 3.1.0 - 2025-05-20
 ### What's Changed
 * Add NC 31 support by @cociweb in https://github.com/nextcloud/unsplash/pull/165

@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * @copyright Copyright (c) 2019 Felix Nüsse <felix.nuesse@t-online.de>
+ * Modified for DailySplash in 2026 (see NOTICE).
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -20,57 +23,72 @@
  *
  */
 
-namespace OCA\Unsplash\Provider;
+namespace OCA\DailySplash\Provider;
 
-use OCA\Unsplash\ProviderHandler\Provider;
+use OCA\DailySplash\ProviderHandler\Provider;
+use OCA\DailySplash\ProviderHandler\ProviderMetadata;
 
 class WikimediaCommonsDaily extends Provider
 {
+    public const ID = 'wikimedia_potd';
+    // Wikimedia only serves a fixed set of thumbnail widths without rate limiting
+    private const THUMB_WIDTH = 1920;
 
-    /**
-     * TODO : Properly get current nextcloud image, currently only the theming one is used.
-     * @var string
-     */
-    public string $DEFAULT_SEARCH = "";
-    public bool $ALLOW_CUSTOMIZING = true;
-    public bool $IS_CACHED = false;
-    public string $DEFAULT_METADATA_URL="https://commons.wikimedia.org/wiki/Main_Page";
-
-    public function getWhitelistResourceUrls()
+    public function getId(): string
     {
-        return ["https://upload.wikimedia.org"];
+        return self::ID;
     }
 
-    public function getRandomImageUrl($size)
+    public function getName(): string
     {
-        return $this->getRandomImageUrlBySearchTerm($this->getRandomSearchTerm(), $size);
+        return 'WikimediaCommons - Picture of the Day';
     }
 
-    public function getRandomImageUrlBySearchTerm($search, $size)
+    public function getAllowedImageHosts(): array
     {
-        $url = 'https://commons.wikimedia.org/w/api.php';
-        $url .= '?action=query';
-        $url .= '&generator=images';
-        $url .= '&titles=Template:Potd/'.date("Y-m-d");
-        $url .= '&prop=imageinfo';
-        $url .= '&iiprop=url';
-        $url .= '&format=json';
+        // thumbnails are served from thumb.wikimedia.org, originals from upload.wikimedia.org
+        return ['thumb.wikimedia.org', 'upload.wikimedia.org'];
+    }
 
-        $response = $this->getData($url);
-        $json = $response !== false ? json_decode($response, true) : null;
+    public function resolveDailyImage(\DateTimeImmutable $today): ?ProviderMetadata
+    {
+        $date = $today->format('Y-m-d');
+        $url = 'https://commons.wikimedia.org/w/api.php?' . http_build_query([
+            'action' => 'query',
+            'format' => 'json',
+            'formatversion' => '2',
+            'generator' => 'images',
+            'titles' => 'Template:Potd/' . $date,
+            'prop' => 'imageinfo',
+            'iiprop' => 'url|mime|extmetadata',
+            'iiurlwidth' => (string)self::THUMB_WIDTH,
+            'iiextmetadatafilter' => 'ImageDescription|Artist|LicenseShortName',
+            'iiextmetadatalanguage' => 'en',
+        ]);
 
-        try {
-            $images = $json['query']['pages'][array_rand($json['query']['pages'])];
-            return $images['imageinfo'][0]['url'];
-        } catch (\Error $e) {
-            $this->logger->alert("Your searchterms likely did not yield results for: ".$this->getName());
+        $json = $this->getJson($url);
+        foreach ($json['query']['pages'] ?? [] as $page) {
+            $info = $page['imageinfo'][0] ?? null;
+            if (!is_array($info) || !is_string($info['thumburl'] ?? null)) {
+                continue;
+            }
+            $meta = $info['extmetadata'] ?? [];
+            $attribution = (string)($info['descriptionurl'] ?? '');
+            if (parse_url($attribution, PHP_URL_SCHEME) !== 'https') {
+                $attribution = 'https://commons.wikimedia.org/wiki/Commons:Picture_of_the_day';
+            }
+            return new ProviderMetadata(
+                $info['thumburl'],
+                $attribution,
+                self::plainText($meta['ImageDescription']['value'] ?? ''),
+                self::plainText($meta['Artist']['value'] ?? '', 120),
+                $this->getName(),
+                $date,
+                self::plainText($meta['LicenseShortName']['value'] ?? '', 60),
+            );
         }
 
-        return (new NextcloudImage($this->appName, $this->logger, $this->config, $this->appData, "Nextcloud", $this->clientService))->getRandomImageUrl($size);
-    }
-
-    public function getCachedImageURL(): string
-    {
-        return $this->getRandomImageUrl("");
+        $this->logger->warning('DailySplash: Wikimedia Commons has no picture of the day for ' . $date, ['app' => 'dailysplash']);
+        return null;
     }
 }

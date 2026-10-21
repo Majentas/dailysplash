@@ -1,5 +1,5 @@
-#unsplash-settings .msg.error,
-#unsplash-settings .msg.success {
+#dailysplash-settings .msg.error,
+#dailysplash-settings .msg.success {
     font-size: 0.65em;
     opacity: 0;
     border-radius: 3px;
@@ -10,12 +10,12 @@
     margin-left: 6px;
 }
 
-#unsplash-settings .msg.error.active,
-#unsplash-settings .msg.success.active {
+#dailysplash-settings .msg.error.active,
+#dailysplash-settings .msg.success.active {
     opacity: 1;
 }
 
-#unsplash-settings h2 {
+#dailysplash-settings h2 {
     position: relative;
 }
 
@@ -24,55 +24,62 @@
 }
 
 
-.unsplash-providerselect, .unsplash-providerselect > p {
+.dailysplash-providerselect, .dailysplash-providerselect > p {
     margin-top: 0.5em;
 }
 
-.unsplash-checkboxes {
+.dailysplash-checkboxes {
     display: flex;
     align-items: center;
 }
 
-.unsplash-checkboxes input {
+.dailysplash-checkboxes input {
     margin: 0 10px !important;
 }
 
-.unsplash-label {
+.dailysplash-label {
     display: inline-block;
     min-width: 175px;
 }
 
-.unsplash-input {
+.dailysplash-input {
     display: inline-block;
     min-width: 250px;
 }
 
-.unsplash-slider {
+.dailysplash-slider {
     display: flex;
     align-items: center;
 }
 
-.unsplash-slider label {
+.dailysplash-slider label {
     min-width: 250px;
 }
 
-.unsplash-slider input {
+.dailysplash-slider input {
     min-width: 250px;
 }
 
-.unsplash-documentation-link {
+.dailysplash-documentation-link {
     margin-left: 10px;
     font-style: italic;
     color: var(--color-primary);
 }
 
-.unsplash-documentation-link:hover {
+.dailysplash-documentation-link:hover {
     color: var(--color-primary-hover);
 }
 
-#unsplash-preview {
+#dailysplash-preview {
     width: 230px;
     height: 140px;
     object-fit: cover;
     object-position: center;
+}
+.dailysplash-error {
+    color: var(--color-error-text, var(--color-error));
+}
+
+.dailysplash-status, #dailysplash-cache > p {
+    margin-top: 0.5em;
 }
