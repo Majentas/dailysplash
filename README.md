@@ -37,31 +37,36 @@ of the dashboard.
 
 ## Installation
 
-DailySplash is not in the Nextcloud App Store; install it from GitHub.
+DailySplash is not in the Nextcloud App Store; install it straight from GitHub.
+The examples use `/var/www/nextcloud` and the web server user `www-data`; adjust
+them to your installation.
 
-1. Download `dailysplash-<version>.tar.gz` from the
-   [latest release](https://github.com/Majentas/dailysplash/releases/latest).
-2. Extract it into your Nextcloud `apps` directory and give it to the web server
-   user:
+1. Clone the latest release into your Nextcloud `apps` directory, as the web
+   server user. The folder must be named `dailysplash`.
    ```sh
-   tar -xzf dailysplash-1.0.0.tar.gz -C /var/www/nextcloud/apps/
-   chown -R www-data:www-data /var/www/nextcloud/apps/dailysplash
+   cd /var/www/nextcloud/apps
+   sudo -u www-data git clone --branch dailysplash-v1.0.0 https://github.com/Majentas/dailysplash.git dailysplash
    ```
-3. Enable it and fetch today's image:
+   Release tags are named `dailysplash-vX.Y.Z` (see the
+   [tags](https://github.com/Majentas/dailysplash/tags)). Plain `vX.Y.Z` tags
+   come from the original Splash app.
+2. Enable the app and fetch today's image:
    ```sh
    sudo -u www-data php /var/www/nextcloud/occ app:enable dailysplash
    sudo -u www-data php /var/www/nextcloud/occ dailysplash:fetch
    ```
 
-Adjust paths and the user (`www-data`) to your installation.
-
-Alternatively, clone the repository into `apps/dailysplash`:
-`git clone https://github.com/Majentas/dailysplash.git dailysplash`.
-
 ### Updating
 
-Replace the `apps/dailysplash` folder with the new release, then run
-`occ upgrade`. Check the [changelog](CHANGELOG.md) first.
+Check the [changelog](CHANGELOG.md), then switch to the new release tag and let
+Nextcloud run the app upgrade:
+
+```sh
+cd /var/www/nextcloud/apps/dailysplash
+sudo -u www-data git fetch --tags
+sudo -u www-data git checkout dailysplash-vX.Y.Z
+sudo -u www-data php /var/www/nextcloud/occ upgrade
+```
 
 ### Uninstalling
 
