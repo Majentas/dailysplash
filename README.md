@@ -46,9 +46,16 @@ them to your installation.
    ```sh
    cd /var/www/nextcloud/apps
    sudo -u www-data git clone --branch dailysplash-v1.0.0 https://github.com/Majentas/dailysplash.git dailysplash
+   sudo -u www-data chmod -R go-rwx dailysplash/.git
    ```
    Releases are tagged `dailysplash-vX.Y.Z`; see the
    [tags](https://github.com/Majentas/dailysplash/tags) for the latest one.
+   Git's "detached HEAD" notice is expected when checking out a tag.
+
+   The `chmod` keeps the `.git` folder away from the web server: many web server
+   setups would otherwise serve it under `/apps/dailysplash/.git/`. If PHP and the
+   web server run as the same user, block `/.git` in your web server configuration
+   instead.
 2. Enable the app and fetch today's image:
    ```sh
    sudo -u www-data php /var/www/nextcloud/occ app:enable dailysplash
