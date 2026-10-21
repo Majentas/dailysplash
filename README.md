@@ -47,9 +47,8 @@ them to your installation.
    cd /var/www/nextcloud/apps
    sudo -u www-data git clone --branch dailysplash-v1.0.0 https://github.com/Majentas/dailysplash.git dailysplash
    ```
-   Release tags are named `dailysplash-vX.Y.Z` (see the
-   [tags](https://github.com/Majentas/dailysplash/tags)). Plain `vX.Y.Z` tags
-   come from the original Splash app.
+   Releases are tagged `dailysplash-vX.Y.Z`; see the
+   [tags](https://github.com/Majentas/dailysplash/tags) for the latest one.
 2. Enable the app and fetch today's image:
    ```sh
    sudo -u www-data php /var/www/nextcloud/occ app:enable dailysplash
