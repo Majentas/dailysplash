@@ -2,6 +2,8 @@
 
 **A new picture of the day on your Nextcloud login page, served by your own server.**
 
+![DailySplash on the Nextcloud login page](screenshots/login.jpg)
+
 DailySplash shows the [Bing](https://www.bing.com) or
 [Wikimedia Commons](https://commons.wikimedia.org/wiki/Commons:Picture_of_the_day)
 picture of the day as the background of the Nextcloud login page, and optionally
@@ -45,7 +47,7 @@ them to your installation.
    server user. The folder must be named `dailysplash`.
    ```sh
    cd /var/www/nextcloud/apps
-   sudo -u www-data git clone --branch dailysplash-v1.0.0 https://github.com/Majentas/dailysplash.git dailysplash
+   sudo -u www-data git clone --branch dailysplash-v1.0.1 https://github.com/Majentas/dailysplash.git dailysplash
    sudo -u www-data chmod -R go-rwx dailysplash/.git
    ```
    Releases are tagged `dailysplash-vX.Y.Z`; see the
@@ -115,6 +117,10 @@ provider by Bruce Mubangwa and many other contributors (see the git history).
 Translations come from the Nextcloud community on Transifex.
 
 The pictures belong to their authors and are shown under their own licences.
+The screenshot shows *Hoverfly October 2007-21* by
+[Alvesgaspar](https://commons.wikimedia.org/wiki/File:Hoverfly_October_2007-21.jpg),
+[CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/), the Wikimedia
+Commons picture of the day of 21 October 2026.
 DailySplash is not affiliated with Nextcloud GmbH, Microsoft or the Wikimedia
 Foundation.
 

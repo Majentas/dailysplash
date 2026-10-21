@@ -3,6 +3,14 @@
 All notable changes to DailySplash. The history of the original Splash app
 (`unsplash`) is kept below for reference.
 
+## 1.0.1 - 2026-10-21
+
+Metadata and documentation only, no code changes.
+
+### Changed
+* `info.xml`: links to the DailySplash repository, documentation link and screenshot for the Nextcloud App Store.
+* README: installation and update from GitHub.
+
 ## 1.0.0 - 2026-10-21
 
 First release of the DailySplash fork (based on upstream Splash 3.2.0-dev, commit 5aa215d).

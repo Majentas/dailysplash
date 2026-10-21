@@ -2,3 +2,4 @@
 .gitattributes export-ignore
 .gitignore export-ignore
 .l10ignore export-ignore
+screenshots export-ignore
