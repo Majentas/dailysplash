@@ -124,6 +124,14 @@ Commons picture of the day of 21 October 2026.
 DailySplash is not affiliated with Nextcloud GmbH, Microsoft or the Wikimedia
 Foundation.
 
+## AI assistance
+
+DailySplash was developed with the help of an AI coding assistant (Claude Code).
+All changes are reviewed, tested on a live Nextcloud instance and maintained by
+the human maintainer, who is responsible for the code. AI-assisted commits carry
+an `Assisted-by:` trailer, following the
+[Nextcloud AI Contribution Policy](https://github.com/nextcloud/.github/blob/master/AI_POLICY.md).
+
 ## Development
 
 There is no build step: `js/` and `css/` are plain files. Code layout:
