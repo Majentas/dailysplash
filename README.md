@@ -127,8 +127,8 @@ Foundation.
 ## AI assistance
 
 DailySplash was developed with the help of an AI coding assistant (Claude Code).
-All changes are reviewed, tested on a live Nextcloud instance and maintained by
-the human maintainer, who is responsible for the code. AI-assisted commits carry
+Changes are tested on a live Nextcloud instance before release, and the human
+maintainer is responsible for the code. AI-assisted commits carry
 an `Assisted-by:` trailer, following the
 [Nextcloud AI Contribution Policy](https://github.com/nextcloud/.github/blob/master/AI_POLICY.md).
 
